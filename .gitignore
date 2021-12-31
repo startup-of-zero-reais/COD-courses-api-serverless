@@ -1,3 +1,5 @@
+!terraform/lambda/functions/.gitkeep
+
 /.terraform
 .idea/
 .vscode/
