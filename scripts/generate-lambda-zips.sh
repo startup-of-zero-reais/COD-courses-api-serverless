@@ -20,6 +20,13 @@ function isEmpty {
     fi    
 }
 
+function clearZip {
+    LAMBDAS=$(ls $TERRAFORM_LAMBDAS)
+    for LAMBDA in $LAMBDAS; do
+        rm $TERRAFORM_LAMBDAS/"$LAMBDA"
+    done
+}
+
 function buildGoLambda {
     local LAMBDA=$1
 
@@ -58,13 +65,15 @@ function generateZip {
 
 LAMBDAS_SOURCE_DIR=$(ls -d src/*/ | awk -F '/' '{print $2}')
 
+clearZip
+sleep 1
+
 for LAMBDA in $LAMBDAS_SOURCE_DIR
 do
     if [ "$(isEmpty $LAMBDA)" == "true" ]; then
         echo "Lambda $LAMBDA está vazio"
         continue
     fi
-
     buildGoLambda $LAMBDA
     sleep 1
     generateZip $LAMBDA
