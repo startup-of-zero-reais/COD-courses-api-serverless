@@ -3,3 +3,5 @@ terraform/**/.terraform.lock*
 .idea/
 .vscode/
 terraform/lambda/functions/*
+
+/src/read_lesson/read_lesson
