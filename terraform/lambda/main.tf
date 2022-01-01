@@ -23,6 +23,8 @@ resource "aws_lambda_function" "this" {
 
   description = format("%s: %s", each.key, each.value.description)
 
+  source_code_hash = filebase64sha256("${path.module}/functions/${each.key}.zip")
+
   tags = merge(local.common_tags, {
     description = format("%s: %s", each.key, each.value.description)
   })
@@ -37,10 +39,10 @@ resource "aws_lambda_permission" "this" {
   principal     = "apigateway.amazonaws.com"
 
   source_arn = format(
-    "%s/*/%s%s",
-    data.aws_api_gateway_rest_api.this.execution_arn,
-    aws_api_gateway_method.this[each.key].http_method,
-    aws_api_gateway_resource.this[each.key].path
+  "%s/*/%s%s",
+  data.aws_api_gateway_rest_api.this.execution_arn,
+  aws_api_gateway_method.this[each.key].http_method,
+  aws_api_gateway_resource.this[each.key].path
   )
 }
 
