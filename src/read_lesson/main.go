@@ -34,6 +34,10 @@ func main() {
 }
 
 func (h Handler) HandleLambda(event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if len(event.QueryStringParameters) <= 0 {
+		return common.ResponseProxy(400, common.NewMessage("forneça os parâmetros de busca"), nil)
+	}
+
 	if event.QueryStringParameters["action"] != "search" {
 		return h.HandleSingleScan(event)
 	}
