@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"log"
@@ -42,20 +43,20 @@ func (h Handler) HandleLambda(event events.APIGatewayProxyRequest) (events.APIGa
 
 func (h Handler) HandleSingleScan(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	var lessonId string
-	if lessonId = request.QueryStringParameters["id"]; lessonId == "" {
-		return common.ResponseProxy(400, common.NewMessage("voce deve fornecer o id"), nil)
+	if lessonId = request.QueryStringParameters["lesson"]; lessonId == "" {
+		return common.ResponseProxy(400, common.NewMessage("voce deve fornecer a lesson"), nil)
 	}
 
 	var sectionId string
-	if sectionId = request.QueryStringParameters["section_id"]; sectionId == "" {
+	if sectionId = request.QueryStringParameters["section"]; sectionId == "" {
 		return common.ResponseProxy(400, common.NewMessage("voce deve fornecer o identificador de seção"), nil)
 	}
 
 	input := &dynamodb.GetItemInput{
 		TableName: h.table,
 		Key: map[string]types.AttributeValue{
-			"ID":       &types.AttributeValueMemberS{Value: fmt.Sprintf("lesson_%s", lessonId)},
-			"ParentID": &types.AttributeValueMemberS{Value: fmt.Sprintf("section_%s", sectionId)},
+			"PK": &types.AttributeValueMemberS{Value: fmt.Sprintf("SECTION#%s", sectionId)},
+			"SK": &types.AttributeValueMemberS{Value: fmt.Sprintf("LESSON#%s", lessonId)},
 		},
 	}
 
@@ -70,7 +71,7 @@ func (h Handler) HandleSingleScan(request events.APIGatewayProxyRequest) (events
 		return common.ResponseProxy(500, common.NewMessage(err.Error()), err)
 	}
 
-	if &item == nil || item.ID == "" {
+	if &item == nil || item.SK == "" {
 		return common.ResponseProxy(404, common.NewMessage("nenhuma aula encontrada com esses parâmetros de busca"), nil)
 	}
 
@@ -78,5 +79,59 @@ func (h Handler) HandleSingleScan(request events.APIGatewayProxyRequest) (events
 }
 
 func (h Handler) HandleSearch(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	return common.ResponseProxy(200, common.NewDataResponse("Ok"), nil)
+	sectionId := request.QueryStringParameters["section"]
+	moduleId := request.QueryStringParameters["module"]
+	courseId := request.QueryStringParameters["course"]
+
+	if sectionId == "" && courseId == "" && moduleId == "" {
+		return common.ResponseProxy(400, common.NewMessage("Busque por curso, módulo ou seção de curso"), nil)
+	}
+
+	input := new(dynamodb.QueryInput)
+	input.TableName = h.table
+
+	var hashKey string
+	var hashValue string
+
+	if courseId != "" {
+		input.IndexName = aws.String("CourseLessonsIndex")
+		hashKey = "ParentCourse"
+		hashValue = fmt.Sprintf("COURSE#%s", courseId)
+	}
+
+	if moduleId != "" {
+		input.IndexName = aws.String("ModuleLessonsIndex")
+		hashKey = "ParentModule"
+		hashValue = fmt.Sprintf("MODULE#%s", moduleId)
+	}
+
+	if sectionId != "" {
+		input.IndexName = nil
+		hashKey = "PK"
+		hashValue = fmt.Sprintf("SECTION#%s", sectionId)
+	}
+
+	expr, _ := expression.NewBuilder().WithKeyCondition(
+		expression.KeyAnd(
+			expression.Key(hashKey).Equal(expression.Value(hashValue)),
+			expression.KeyBeginsWith(expression.Key("SK"), "LESSON#"),
+		),
+	).Build()
+
+	input.KeyConditionExpression = expr.KeyCondition()
+	input.ExpressionAttributeValues = expr.Values()
+	input.ExpressionAttributeNames = expr.Names()
+
+	output, err := h.dynamoClient.Query(context.TODO(), input)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage("Falha ao executar scan"), err)
+	}
+
+	var lessons []common.Lesson
+	err = attributevalue.UnmarshalListOfMaps(output.Items, &lessons)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage("Falha ao executar unmarshal"), err)
+	}
+
+	return common.ResponseProxy(200, common.NewDataResponse(lessons), nil)
 }

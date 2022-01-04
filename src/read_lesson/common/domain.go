@@ -1,18 +1,14 @@
 package common
 
 type (
-	Artifact struct {
-		ID          string `json:"artifact_id"`
-		ParentID    string `json:"lesson_id"`
-		MediaSource string `json:"media_source"`
-	}
-
 	Lesson struct {
-		ID            string     `json:"lesson_id"`
-		ParentID      string     `json:"section_id"`
-		Label         string     `json:"label"`
-		MediaSource   string     `json:"video_source"`
-		DurationTotal uint       `json:"duration_total"`
-		Artifacts     []Artifact `json:"artifacts"`
+		SK            string            `json:"lesson_id"`
+		PK            string            `json:"section_id"`
+		Title         string            `json:"title"`
+		VideoSource   string            `json:"video_source"`
+		DurationTotal uint              `json:"duration_total"`
+		ParentCourse  string            `json:"parent_course"`
+		ParentModule  string            `json:"parent_module"`
+		Artifacts     map[string]string `json:"artifacts"`
 	}
 )
