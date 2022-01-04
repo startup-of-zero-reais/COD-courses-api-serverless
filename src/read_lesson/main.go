@@ -2,83 +2,81 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"log"
+	"read_lesson/common"
 )
 
-type (
-	Item struct {
-		ID       string `json:"course_id"`
-		ParentID string `json:"module_id"`
-	}
-)
-
-func main() {
-	lambda.Start(handler)
+type Handler struct {
+	dynamoClient *dynamodb.Client
+	table        *string
 }
 
-var table = aws.String("code-craft-courses-table")
-
-func handler(event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	client, err := DynamoConnection()
+func main() {
+	dynamoClient, err := common.DynamoConnection()
 	if err != nil {
-		return ResponseProxy(500, &MessageResponse{}, err)
+		log.Fatalf("failed to load config, %v", err)
 	}
 
-	exprBuilder := expression.NewBuilder()
-
-	if courseId := event.QueryStringParameters["course_id"]; courseId != "" {
-		exprBuilder = exprBuilder.WithFilter(
-			expression.Name("ID").Equal(expression.Value(courseId)),
-		)
-	} else {
-		return ResponseProxy(400, &MessageResponse{Message: "voce deve fornecer o course_id"}, nil)
+	h := Handler{
+		dynamoClient: dynamoClient,
+		table:        aws.String("code-craft-courses-table"),
 	}
 
-	if moduleId := event.QueryStringParameters["module_id"]; moduleId != "" {
-		exprBuilder = exprBuilder.WithFilter(
-			expression.Name("ParentID").Equal(expression.Value(moduleId)),
-		)
+	lambda.Start(h.HandleLambda)
+}
+
+func (h Handler) HandleLambda(event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if event.QueryStringParameters["action"] != "search" {
+		return h.HandleSingleScan(event)
 	}
 
-	expr, err := exprBuilder.WithProjection(
-		expression.NamesList(expression.Name("ID"), expression.Name("ParentID")),
-	).Build()
+	return h.HandleSearch(event)
+}
+
+func (h Handler) HandleSingleScan(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	var lessonId string
+	if lessonId = request.QueryStringParameters["id"]; lessonId == "" {
+		return common.ResponseProxy(400, common.NewMessage("voce deve fornecer o id"), nil)
+	}
+
+	var sectionId string
+	if sectionId = request.QueryStringParameters["section_id"]; sectionId == "" {
+		return common.ResponseProxy(400, common.NewMessage("voce deve fornecer o identificador de seção"), nil)
+	}
+
+	input := &dynamodb.GetItemInput{
+		TableName: h.table,
+		Key: map[string]types.AttributeValue{
+			"ID":       &types.AttributeValueMemberS{Value: fmt.Sprintf("lesson_%s", lessonId)},
+			"ParentID": &types.AttributeValueMemberS{Value: fmt.Sprintf("section_%s", sectionId)},
+		},
+	}
+
+	output, err := h.dynamoClient.GetItem(context.TODO(), input)
 	if err != nil {
-		return ResponseProxy(500, &MessageResponse{}, err)
+		return common.ResponseProxy(500, common.NewMessage(err.Error()), err)
 	}
 
-	log.Printf("Expr: %+v\n", expr)
-
-	input := &dynamodb.ScanInput{
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-		FilterExpression:          expr.Filter(),
-		ProjectionExpression:      expr.Projection(),
-		TableName:                 table,
-	}
-
-	output, err := client.Scan(context.TODO(), input)
+	var item common.Lesson
+	err = attributevalue.UnmarshalMap(output.Item, &item)
 	if err != nil {
-		return ResponseProxy(500, &MessageResponse{}, err)
+		return common.ResponseProxy(500, common.NewMessage(err.Error()), err)
 	}
 
-	var items []Item
-
-	err = attributevalue.UnmarshalListOfMaps(output.Items, &items)
-	if err != nil {
-		return ResponseProxy(500, &MessageResponse{}, err)
+	if &item == nil || item.ID == "" {
+		return common.ResponseProxy(404, common.NewMessage("nenhuma aula encontrada com esses parâmetros de busca"), nil)
 	}
 
-	log.Printf("Request: %s\n", event.QueryStringParameters)
-	if err != nil {
-		return ResponseProxy(500, &MessageResponse{}, err)
-	}
+	return common.ResponseProxy(200, common.NewDataResponse(&item), nil)
+}
 
-	return ResponseProxy(200, &DataResponse{Data: items}, nil)
+func (h Handler) HandleSearch(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	return common.ResponseProxy(200, common.NewDataResponse("Ok"), nil)
 }

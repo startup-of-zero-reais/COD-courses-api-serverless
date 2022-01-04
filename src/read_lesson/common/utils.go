@@ -1,12 +1,20 @@
-package main
+package common
 
-import "github.com/aws/aws-lambda-go/events"
+import (
+	"encoding/json"
+	"github.com/aws/aws-lambda-go/events"
+)
 
 type (
 	Stringify interface {
 		String() string
 	}
 )
+
+func ToString(s interface{}) string {
+	bytes, _ := json.Marshal(s)
+	return string(bytes)
+}
 
 func Json(s Stringify) string {
 	if s == nil {
