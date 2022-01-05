@@ -60,10 +60,11 @@ resource "aws_api_gateway_resource" "this" {
 resource "aws_api_gateway_method" "this" {
   for_each = local.lambdas_resources
 
-  rest_api_id   = data.aws_api_gateway_rest_api.this.id
-  resource_id   = aws_api_gateway_resource.this[each.key].id
-  http_method   = each.value.method
-  authorization = each.value.authorization
+  rest_api_id      = data.aws_api_gateway_rest_api.this.id
+  resource_id      = aws_api_gateway_resource.this[each.key].id
+  http_method      = each.value.method
+  authorization    = each.value.authorization
+  api_key_required = true
 }
 
 resource "aws_api_gateway_integration" "this" {
@@ -88,6 +89,7 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_resource.this[each.key].id,
       aws_api_gateway_method.this[each.key].id,
       aws_api_gateway_integration.this[each.key].id,
+      aws_api_gateway_method.this[each.key].api_key_required
     ]))
   }
 
