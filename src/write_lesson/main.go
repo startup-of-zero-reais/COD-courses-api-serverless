@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"log"
+	"reflect"
 	"write_lesson/common"
 )
 
@@ -30,6 +34,36 @@ func main() {
 	lambda.Start(h.HandleLambda)
 }
 
-func (receiver Handler) HandleLambda(event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	return common.ResponseProxy(200, common.NewDataResponse(event.Body), nil)
+func (h Handler) HandleLambda(event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if event.Body == "" {
+		return common.ResponseProxy(400, common.NewMessage("você deve fornecer os dados para serem adicionados"), nil)
+	}
+
+	lesson, err := h.ValidateBody(event.Body)
+	if err != nil {
+		return common.ResponseProxy(400, common.NewMessage(fmt.Sprintf("erro de validação: %s", err.Error())), nil)
+	}
+
+	return common.ResponseProxy(200, common.NewDataResponse(lesson), nil)
+}
+
+func (h Handler) ValidateBody(message string) (*common.Lesson, error) {
+	var lesson common.Lesson
+	err := json.Unmarshal([]byte(message), &lesson)
+	if err != nil {
+		return nil, err
+	}
+
+	reflected := reflect.ValueOf(lesson)
+	refType := reflect.TypeOf(lesson)
+
+	for i := 0; i < reflected.NumField(); i++ {
+		field := reflected.Field(i)
+		fieldName := refType.Field(i).Tag.Get("json")
+		if field.IsZero() && fieldName != "artifacts" {
+			return nil, errors.New(fmt.Sprintf("O campo %s é obrigatório", fieldName))
+		}
+	}
+
+	return &lesson, nil
 }
