@@ -6,6 +6,10 @@ locals {
     Project   = var.project
   }
 
+  api_resources = {
+    lessons = true
+  }
+
   lambdas_resources = {
     read_lesson = {
       path          = "lessons"

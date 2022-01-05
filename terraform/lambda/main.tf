@@ -42,26 +42,30 @@ resource "aws_lambda_permission" "this" {
   "%s/*/%s%s",
   data.aws_api_gateway_rest_api.this.execution_arn,
   aws_api_gateway_method.this[each.key].http_method,
-  aws_api_gateway_resource.this[each.key].path
+  aws_api_gateway_resource.this[each.value.path].path
   )
-}
 
+  depends_on = [
+    aws_api_gateway_method.this,
+    aws_api_gateway_resource.this,
+  ]
+}
 
 # API Gateway resource
 
 resource "aws_api_gateway_resource" "this" {
-  for_each = local.lambdas_resources
+  for_each = local.api_resources
 
   rest_api_id = data.aws_api_gateway_rest_api.this.id
   parent_id   = data.aws_api_gateway_resource.v1.id
-  path_part   = each.value.path
+  path_part   = each.key
 }
 
 resource "aws_api_gateway_method" "this" {
   for_each = local.lambdas_resources
 
   rest_api_id      = data.aws_api_gateway_rest_api.this.id
-  resource_id      = aws_api_gateway_resource.this[each.key].id
+  resource_id      = aws_api_gateway_resource.this[each.value.path].id
   http_method      = each.value.method
   authorization    = each.value.authorization
   api_key_required = true
@@ -71,7 +75,7 @@ resource "aws_api_gateway_integration" "this" {
   for_each = local.lambdas_resources
 
   rest_api_id             = data.aws_api_gateway_rest_api.this.id
-  resource_id             = aws_api_gateway_resource.this[each.key].id
+  resource_id             = aws_api_gateway_resource.this[each.value.path].id
   http_method             = lookup(local.lambdas_resources, each.key, { method = "GET" }).method
   type                    = "AWS_PROXY"
   integration_http_method = "POST"
@@ -86,7 +90,7 @@ resource "aws_api_gateway_deployment" "this" {
 
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_resource.this[each.key].id,
+      aws_api_gateway_resource.this[each.value.path].id,
       aws_api_gateway_method.this[each.key].id,
       aws_api_gateway_integration.this[each.key].id,
       aws_api_gateway_method.this[each.key].api_key_required
