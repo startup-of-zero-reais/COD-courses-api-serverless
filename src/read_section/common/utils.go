@@ -25,9 +25,15 @@ func Json(s Stringify) string {
 }
 
 func ResponseProxy(statusCode int, body Stringify, err error) (events.APIGatewayProxyResponse, error) {
-	return events.APIGatewayProxyResponse{
+	response := events.APIGatewayProxyResponse{
 		StatusCode:      statusCode,
 		Body:            Json(body),
 		IsBase64Encoded: false,
-	}, err
+	}
+
+	if err != nil {
+		response.Body = err.Error()
+	}
+
+	return response, nil
 }
