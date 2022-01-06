@@ -7,7 +7,8 @@ locals {
   }
 
   api_resources = {
-    lessons = true
+    lessons  = true
+    sections = true
   }
 
   lambdas_resources = {
@@ -21,6 +22,13 @@ locals {
     write_lesson = {
       path          = "lessons"
       method        = "POST",
+      authorization = "NONE"
+      description   = "Lambda para cadastro de uma aula"
+    }
+
+    read_section = {
+      path          = "sections"
+      method        = "GET",
       authorization = "NONE"
       description   = "Lambda para cadastro de uma aula"
     }

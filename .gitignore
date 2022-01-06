@@ -4,5 +4,5 @@ terraform/**/.terraform.lock*
 .vscode/
 terraform/lambda/functions/*
 
-/src/read_lesson/read_lesson
-/src/write_lesson/write_lesson
+/src/write_*/write_*
+/src/read_*/read_*
