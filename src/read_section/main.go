@@ -74,7 +74,7 @@ func (h Handler) Get(request events.APIGatewayProxyRequest) (events.APIGatewayPr
 	}
 
 	if &item == nil || item.SK == "" {
-		return common.ResponseProxy(500, common.NewMessage(err.Error()), nil)
+		return common.ResponseProxy(404, common.NewMessage("Seção não encontrada"), nil)
 	}
 
 	return common.ResponseProxy(200, common.NewDataResponse(&item), nil)
