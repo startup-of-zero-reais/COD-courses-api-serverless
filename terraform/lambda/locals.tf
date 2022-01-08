@@ -30,7 +30,14 @@ locals {
       path          = "sections"
       method        = "GET",
       authorization = "NONE"
-      description   = "Lambda para cadastro de uma aula"
+      description   = "Lambda para leitura de uma seção"
+    }
+
+    write_section = {
+      path          = "sections"
+      method        = "POST",
+      authorization = "NONE"
+      description   = "Lambda para cadastro de uma seção"
     }
   }
 }
