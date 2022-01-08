@@ -110,6 +110,10 @@ func (h Handler) Search(request events.APIGatewayProxyRequest) (events.APIGatewa
 		return common.ResponseProxy(500, common.NewMessage("Falha ao executar query"), err)
 	}
 
+	if output.Count <= 0 {
+		return common.ResponseProxy(404, common.NewMessage("Nenhum resultado encontrado para a busca"), nil)
+	}
+
 	var sections []common.Section
 	err = attributevalue.UnmarshalListOfMaps(output.Items, &sections)
 	if err != nil {
