@@ -47,5 +47,12 @@ locals {
       authorization = "NONE"
       description   = "Lambda para leitura de um módulo"
     }
+
+    write_module = {
+      path          = "modules"
+      method        = "POST",
+      authorization = "NONE"
+      description   = "Lambda para cadastro de um módulo"
+    }
   }
 }
