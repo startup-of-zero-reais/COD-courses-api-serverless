@@ -10,6 +10,7 @@ locals {
     lessons  = true
     sections = true
     modules  = true
+    courses  = true
   }
 
   lambdas_resources = {
@@ -53,6 +54,13 @@ locals {
       method        = "POST",
       authorization = "NONE"
       description   = "Lambda para cadastro de um módulo"
+    }
+
+    read_course = {
+      path          = "courses"
+      method        = "GET",
+      authorization = "NONE"
+      description   = "Lambda para leitura de um cursos"
     }
   }
 }
