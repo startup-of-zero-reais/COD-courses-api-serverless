@@ -62,5 +62,12 @@ locals {
       authorization = "NONE"
       description   = "Lambda para leitura de um cursos"
     }
+
+    write_course = {
+      path          = "courses"
+      method        = "POST",
+      authorization = "NONE"
+      description   = "Lambda para cadastro de um módulo"
+    }
   }
 }
