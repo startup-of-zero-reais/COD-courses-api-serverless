@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"log"
 	"read_module/common"
 )
@@ -37,9 +42,85 @@ func (h Handler) HandleLambda(request events.APIGatewayProxyRequest) (events.API
 }
 
 func (h Handler) Get(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	return common.ResponseProxy(200, common.NewMessage("OK"), nil)
+	var courseId string
+	if courseId = request.QueryStringParameters["course"]; courseId == "" {
+		return common.ResponseProxy(400, common.NewMessage("course é um parâmetro de busca obrigatório"), nil)
+	}
+
+	var moduleId string
+	if moduleId = request.QueryStringParameters["module"]; moduleId == "" {
+		return common.ResponseProxy(400, common.NewMessage("module é um parâmetro de busca obrigatório"), nil)
+	}
+
+	hashValue := fmt.Sprintf("COURSE#%s", courseId)
+	rangeValue := fmt.Sprintf("MODULE#%s", moduleId)
+
+	input := &dynamodb.GetItemInput{
+		TableName: h.table,
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: hashValue},
+			"SK": &types.AttributeValueMemberS{Value: rangeValue},
+		},
+	}
+
+	output, err := h.dynamoClient.GetItem(context.TODO(), input)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage(fmt.Sprintf("erro ao recuperar itens: %v", err)), nil)
+	}
+
+	var item common.Module
+	err = attributevalue.UnmarshalMap(output.Item, &item)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage(fmt.Sprintf("erro ao executar unmarshal: %v", err)), nil)
+	}
+
+	if &item == nil || item.SK == "" {
+		return common.ResponseProxy(404, common.NewMessage("nenhum resultado encontrado"), err)
+	}
+
+	return common.ResponseProxy(200, common.NewDataResponse(item), nil)
 }
 
 func (h Handler) Search(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	return common.ResponseProxy(200, common.NewMessage("OK"), nil)
+	courseId := request.QueryStringParameters["course"]
+
+	if courseId == "" {
+		return common.ResponseProxy(404, common.NewMessage("forneça um identificador de curso para busca"), nil)
+	}
+
+	hashValue := fmt.Sprintf("COURSE#%s", courseId)
+	input := new(dynamodb.QueryInput)
+	input.TableName = h.table
+
+	expr, err := expression.NewBuilder().WithKeyCondition(
+		expression.KeyAnd(
+			expression.Key("PK").Equal(expression.Value(hashValue)),
+			expression.KeyBeginsWith(expression.Key("SK"), "MODULE#"),
+		),
+	).Build()
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage(err.Error()), err)
+	}
+
+	input.KeyConditionExpression = expr.KeyCondition()
+	input.ExpressionAttributeValues = expr.Values()
+	input.ExpressionAttributeNames = expr.Names()
+
+	output, err := h.dynamoClient.Query(context.TODO(), input)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage("Falha ao executar query"), err)
+	}
+
+	if output.Count <= 0 {
+		return common.ResponseProxy(404, common.NewMessage("Nenhum resultado encontrado para a busca"), nil)
+	}
+
+	var modules []common.Module
+	err = attributevalue.UnmarshalListOfMaps(output.Items, &modules)
+
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage("falha ao executar unmarshal"), err)
+	}
+
+	return common.ResponseProxy(200, common.NewDataResponse(modules), nil)
 }
