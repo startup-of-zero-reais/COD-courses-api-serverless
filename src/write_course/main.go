@@ -87,6 +87,8 @@ func (h Handler) ValidateBody(message string) (*common.Course, error) {
 		"created_at",
 		"updated_at",
 		"cart_open",
+		"user_id",
+		"owner_id",
 	}
 
 	inSlice := func(fieldName string) bool {
