@@ -67,7 +67,7 @@ locals {
       path          = "courses"
       method        = "POST",
       authorization = "NONE"
-      description   = "Lambda para cadastro de um módulo"
+      description   = "Lambda para cadastro de um cursos"
     }
   }
 }
