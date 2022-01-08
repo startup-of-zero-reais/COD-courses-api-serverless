@@ -9,6 +9,7 @@ locals {
   api_resources = {
     lessons  = true
     sections = true
+    modules  = true
   }
 
   lambdas_resources = {
@@ -38,6 +39,13 @@ locals {
       method        = "POST",
       authorization = "NONE"
       description   = "Lambda para cadastro de uma seção"
+    }
+
+    read_module = {
+      path          = "modules"
+      method        = "GET",
+      authorization = "NONE"
+      description   = "Lambda para leitura de um módulo"
     }
   }
 }
