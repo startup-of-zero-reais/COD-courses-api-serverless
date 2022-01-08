@@ -28,6 +28,18 @@ func main() {
 	lambda.Start(h.HandleLambda)
 }
 
-func (h Handler) HandleLambda(event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func (h Handler) HandleLambda(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if request.QueryStringParameters["action"] != "search" {
+		return h.Get(request)
+	}
+
+	return h.Search(request)
+}
+
+func (h Handler) Get(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	return common.ResponseProxy(200, common.NewMessage("OK"), nil)
+}
+
+func (h Handler) Search(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return common.ResponseProxy(200, common.NewMessage("OK"), nil)
 }
