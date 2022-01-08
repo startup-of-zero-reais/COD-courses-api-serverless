@@ -78,3 +78,5 @@ do
     sleep 1
     generateZip $LAMBDA
 done
+
+printf "\nProcesso finalizado"
