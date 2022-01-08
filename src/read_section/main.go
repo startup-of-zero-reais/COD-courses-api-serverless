@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"log"
@@ -80,5 +81,40 @@ func (h Handler) Get(request events.APIGatewayProxyRequest) (events.APIGatewayPr
 }
 
 func (h Handler) Search(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	return common.ResponseProxy(200, common.NewDataResponse("Search Request"), nil)
+	moduleId := request.QueryStringParameters["module"]
+
+	if moduleId == "" {
+		return common.ResponseProxy(400, common.NewMessage("Forneça um modulo para busca"), nil)
+	}
+
+	hashValue := fmt.Sprintf("MODULE#%s", moduleId)
+	input := new(dynamodb.QueryInput)
+	input.TableName = h.table
+
+	expr, err := expression.NewBuilder().WithKeyCondition(
+		expression.KeyAnd(
+			expression.Key("PK").Equal(expression.Value(hashValue)),
+			expression.KeyBeginsWith(expression.Key("SK"), "SECTION#"),
+		),
+	).Build()
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage(err.Error()), err)
+	}
+
+	input.KeyConditionExpression = expr.KeyCondition()
+	input.ExpressionAttributeValues = expr.Values()
+	input.ExpressionAttributeNames = expr.Names()
+
+	output, err := h.dynamoClient.Query(context.TODO(), input)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage("Falha ao executar query"), err)
+	}
+
+	var sections []common.Section
+	err = attributevalue.UnmarshalListOfMaps(output.Items, &sections)
+	if err != nil {
+		return common.ResponseProxy(500, common.NewMessage("falha ao executar unmarshal"), err)
+	}
+
+	return common.ResponseProxy(200, common.NewDataResponse(sections), nil)
 }
