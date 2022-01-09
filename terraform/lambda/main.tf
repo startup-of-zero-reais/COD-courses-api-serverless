@@ -71,6 +71,85 @@ resource "aws_api_gateway_method" "this" {
   api_key_required = true
 }
 
+resource "aws_api_gateway_method_response" "options_response" {
+  for_each = local.lambdas_resources
+
+  rest_api_id         = data.aws_api_gateway_rest_api.this.id
+  resource_id         = aws_api_gateway_resource.this[each.value.path].id
+  http_method         = aws_api_gateway_method.this[each.key].http_method
+  status_code         = 200
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
+
+  depends_on = [aws_api_gateway_method.this]
+}
+
+resource "aws_api_gateway_method" "options" {
+  for_each = local.api_resources
+
+  rest_api_id   = data.aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.this[each.key].id
+  authorization = "NONE"
+  http_method   = "OPTIONS"
+}
+
+resource "aws_api_gateway_method_response" "options_200" {
+  for_each = local.api_resources
+
+  rest_api_id = data.aws_api_gateway_rest_api.this.id
+  resource_id = aws_api_gateway_resource.this[each.key].id
+  http_method = aws_api_gateway_method.options[each.key].http_method
+  status_code = 200
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true,
+    "method.response.header.Access-Control-Allow-Methods" = true,
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.user"                         = true
+  }
+
+  depends_on = [aws_api_gateway_method.options]
+}
+
+resource "aws_api_gateway_integration" "options_integration" {
+  for_each = local.api_resources
+
+  rest_api_id = data.aws_api_gateway_rest_api.this.id
+  resource_id = aws_api_gateway_resource.this[each.key].id
+  http_method = aws_api_gateway_method.options[each.key].http_method
+  type        = "MOCK"
+  depends_on  = [aws_api_gateway_method.options]
+
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_integration_response" {
+  for_each = local.api_resources
+
+  rest_api_id = data.aws_api_gateway_rest_api.this.id
+  resource_id = aws_api_gateway_resource.this[each.key].id
+  http_method = aws_api_gateway_method.options[each.key].http_method
+  status_code = aws_api_gateway_method_response.options_200[each.key].status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,user'",
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS,POST,PUT'",
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.user"                         = "integration.response.header.user"
+  }
+
+  depends_on = [aws_api_gateway_method_response.options_200]
+}
+
 resource "aws_api_gateway_integration" "this" {
   for_each = local.lambdas_resources
 
@@ -92,8 +171,7 @@ resource "aws_api_gateway_deployment" "this" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.this[each.value.path].id,
       aws_api_gateway_method.this[each.key].id,
-      aws_api_gateway_integration.this[each.key].id,
-      aws_api_gateway_method.this[each.key].api_key_required
+      aws_api_gateway_integration.this[each.key].id
     ]))
   }
 
