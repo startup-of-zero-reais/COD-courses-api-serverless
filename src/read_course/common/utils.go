@@ -26,8 +26,12 @@ func Json(s Stringify) string {
 
 func ResponseProxy(statusCode int, body Stringify, err error) (events.APIGatewayProxyResponse, error) {
 	response := events.APIGatewayProxyResponse{
-		StatusCode:      statusCode,
-		Body:            Json(body),
+		StatusCode: statusCode,
+		Body:       Json(body),
+		Headers: map[string]string{
+			"Access-Control-Allow-Origin":  "*",
+			"Access-Control-Allow-Headers": "Origin, Content-Type, user, X-Api-key, Authorization",
+		},
 		IsBase64Encoded: false,
 	}
 
